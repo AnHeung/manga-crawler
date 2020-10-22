@@ -1,5 +1,6 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
+const Async = require('async');
 
 // https://manatoki81.net/bbs/search.php?stx=%ED%82%B9%EB%8D%A4
 
@@ -43,7 +44,7 @@ async function checkSite(query) {
                     setTimeout(async () => {
                         let site = `https://manatoki${siteNo}.net/bbs/search.php?`
                         console.log(`접속 시도 사이트 ${site}`)
-                        const page = await axios.get(site, { params: { stx: query }, timeout: 3000 })
+                        const page = await axios.get(site, { params: { stx: query }, timeout: 10000 })
                             .catch(err => {
                                 console.error(`통신 에러 : ${err}`)
                                 if (errCount === 3) {
@@ -127,33 +128,33 @@ async function scrollAction(page) {
     //페이지가 바로 로딩이 안되서 스크롤 액션 실행
     const scrollHeight = 'document.body.scrollHeight';
     let previousHeight = await page.evaluate(scrollHeight);
-    const per = previousHeight/10
+    const per = previousHeight / 10
     console.log(`scrollHeight : ${previousHeight}`)
 
-    await page.evaluate(async (per)=>{
-    let promise = Promise.resolve()
-        for(let i = 0; i < 10; i++){
-            promise = promise.then(()=>{
-                return new Promise(res=>{
+    await page.evaluate(async (per) => {
+        let promise = Promise.resolve()
+        for (let i = 0; i < 10; i++) {
+            promise = promise.then(() => {
+                return new Promise(res => {
                     setTimeout(() => {
-                        window.scrollTo(i*per, (i+1)*per)
+                        window.scrollTo(i * per, (i + 1) * per)
                         res(i)
-                    }, 500);
+                    }, 200);
                 })
             })
         }
         return promise
-    },(per));
+    }, (per));
 }
 
-async function browserWaitForImgLoading(page, time) {
+async function browserWaitForImgLoading(page) {
     await scrollAction(page)
     await page.waitForSelector('div.view-padding');
 }
 
 async function loadingBrowser(url) {
     const puppeteer = require('puppeteer')
-    const browser = await puppeteer.launch({ headless: false, args: ['--no-sandbox', '--window-size=500,500'] });
+    const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--window-size=500,500'] });
     const page = await browser.newPage();
     page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36WAIT_UNTIL=load")
     await page.goto(url, { waitUntil: 'networkidle0' })
@@ -167,18 +168,31 @@ async function getImgs(url, count = 0, currentPage) {
         if (count === 3) throw new Error('3회 초과')
 
         const page = currentPage || await loadingBrowser(url)
-        await browserWaitForImgLoading(page, 3000)
-        const imgArr = await page.evaluate(() => Array.from(document.querySelectorAll('div.view-padding img')).map(data=>data.src))
+        await browserWaitForImgLoading(page)
+        const imgArr = await page.evaluate(() => Array.from(document.querySelectorAll('div.view-padding img')).map(data => data.src))
 
-        const result = imgArr.find(data => data.includes('loading-image'))
+        const isLoading = imgArr.find(data => data.includes('loading-image'))
         //크롤링 햇을때 이미지가 아직 로딩중이라면...
-        if (result) {
+        if (isLoading) {
             await page.reload({ waitUntil: ['networkidle2'] });
             getImgs(url, ++count, page)
-        }else{
-            imgArr.filter(img=>{
-                return false
-            })
+        } else {
+            const content = await page.content()
+            const $ = await cheerio.load(content)
+            const downImgs = Array.from($('div.view-padding div'))
+                .filter(data => $(data).attr('id') !== 'html_encoder_div') // 다른 만화 이미지까지 추가되는 html이라 거름
+                .map(data => {
+                    return $(data).find('img')
+                })
+                .reduce((acc, imgs) => {
+                    const divImgs = imgs || []
+                    if (acc.length <= divImgs.length) return divImgs
+                    return acc
+                }, [])
+                .map(data=>$(data).attr('src'))
+
+            console.log(`다운 받을 이미지 목록 : ${downImgs}`)
+            return downImgs;
         }
     } catch (err) {
         console.error(`이미지 불러오기 실패 ${err}`)
@@ -196,13 +210,20 @@ async function crawlingSite(query) {
             const tempTitle = searchPage[0].title || ''
             const detailSite = await getDetailPageInfo(tempTitle, tempUrl)
 
-            await getImgs(detailSite[0].url)
+            Async.mapLimit(detailSite, 10, async ({ url, title }) => {
+                return await getImgs(url)
+            })
+                .then(data => {
+                    console.log(data)
+                })
+
+
         }
     } catch (err) {
-        console.error(err)
+        console.error(`crawlingSite err : ${err}`)
     }
 }
 
 (async () => {
-    crawlingSite('킹덤')
+    crawlingSite('타카기')
 })()
