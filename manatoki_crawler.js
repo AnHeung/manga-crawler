@@ -1,5 +1,5 @@
 const axios = require('axios');
-const cheerio = require('cheerio')
+const cheerio = require('cheerio');
 
 // https://manatoki81.net/bbs/search.php?stx=%ED%82%B9%EB%8D%A4
 
@@ -26,6 +26,7 @@ async function test() {
 async function checkSite(query) {
 
     let promise = Promise.resolve()
+    //나중에 몽고디비에서 조회할 예정
     let siteNo = 82
     let errCount = 0
     let completeSign = false
@@ -114,18 +115,74 @@ async function getDetailPageInfo(tempTitle, tempUrl) {
 
 }
 
-async function getImgs(url) {
+function wait(time) {
+    return new Promise(res => {
+        setTimeout(() => {
+            res()
+        }, time);
+    })
+}
 
+async function scrollAction(page) {
+    //페이지가 바로 로딩이 안되서 스크롤 액션 실행
+    const scrollHeight = 'document.body.scrollHeight';
+    let previousHeight = await page.evaluate(scrollHeight);
+    const per = previousHeight/10
+    console.log(`scrollHeight : ${previousHeight}`)
+
+    await page.evaluate(async (per)=>{
+    let promise = Promise.resolve()
+        for(let i = 0; i < 10; i++){
+            promise = promise.then(()=>{
+                return new Promise(res=>{
+                    setTimeout(() => {
+                        window.scrollTo(i*per, (i+1)*per)
+                        res(i)
+                    }, 500);
+                })
+            })
+        }
+        return promise
+    },(per));
+}
+
+async function browserWaitForImgLoading(page, time) {
+    await scrollAction(page)
+    await page.waitForSelector('div.view-padding');
+}
+
+async function loadingBrowser(url) {
     const puppeteer = require('puppeteer')
-    // const imgPage = await axios.get(url, { timeout: 3000 })
-    const browser = await puppeteer.launch({ headless: false, args: ['--no-sandbox'] });
+    const browser = await puppeteer.launch({ headless: false, args: ['--no-sandbox', '--window-size=500,500'] });
     const page = await browser.newPage();
+    page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36WAIT_UNTIL=load")
+    await page.goto(url, { waitUntil: 'networkidle0' })
+    return page
+}
 
-    await page.goto(url, { waitUntil: 'networkidle2' });
-    await page.waitForSelector('div.view-content');
 
-    console.log(page)
+async function getImgs(url, count = 0, currentPage) {
 
+    try {
+        if (count === 3) throw new Error('3회 초과')
+
+        const page = currentPage || await loadingBrowser(url)
+        await browserWaitForImgLoading(page, 3000)
+        const imgArr = await page.evaluate(() => Array.from(document.querySelectorAll('div.view-padding img')).map(data=>data.src))
+
+        const result = imgArr.find(data => data.includes('loading-image'))
+        //크롤링 햇을때 이미지가 아직 로딩중이라면...
+        if (result) {
+            await page.reload({ waitUntil: ['networkidle2'] });
+            getImgs(url, ++count, page)
+        }else{
+            imgArr.filter(img=>{
+                return false
+            })
+        }
+    } catch (err) {
+        console.error(`이미지 불러오기 실패 ${err}`)
+    }
 }
 
 async function crawlingSite(query) {
