@@ -96,7 +96,7 @@ async function getDetailPageInfo(tempTitle, tempUrl) {
     console.log(`세부 목록 ${JSON.stringify(detailArr)}`)
     return detailArr
 }
-
+//test
 function wait(time) {
     return new Promise(res => {
         setTimeout(() => {
