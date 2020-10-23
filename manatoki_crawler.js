@@ -2,6 +2,8 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const Async = require('async');
 
+
+//최근 성공했던 숫자 기준으로 총 3회 숫자올려서 검사 (사이트 주소가 자주 바뀌기 때문에)
 async function checkSite(query) {
 
     let promise = Promise.resolve()
@@ -53,6 +55,7 @@ async function checkSite(query) {
         })
 }
 
+//검색 페이지 리스트
 async function getSearchPageInfo(pageInfo) {
 
     const page = pageInfo.page
@@ -68,14 +71,15 @@ async function getSearchPageInfo(pageInfo) {
             const author = data.find('div.media-info').text().trim() || ''
             return { url, imgUrl, title, author }
         })
-    console.log(`comicArr : ${comicArr}`)
+    console.log(`검색페이지에서 나오는 만화 목록 : ${comicArr}`)
 
     return comicArr
 }
 
+//검색해서 클릭까지 햇을때 해당 만화 세부페이지
 async function getDetailPageInfo(tempTitle, tempUrl) {
 
-    const detailPage = await axios.get(tempUrl, { timeout: 3000 })
+    const detailPage = await axios.get(tempUrl, { timeout: 10000 })
 
     const $ = cheerio.load(detailPage.data, { ignoreWhitespace: true })
 
@@ -84,14 +88,13 @@ async function getDetailPageInfo(tempTitle, tempUrl) {
         .map(raw => $(raw))
         .map(data => {
             const regex = new RegExp(tempTitle + '.*화', "gi")
-            const title = regex.exec(data.find('a').text()) || ''
+            const title = regex.exec(data.find('a').text()).toString() || ''
             const url = data.find('a').attr('href') || ''
             console.log(`title :${title} ,  url : ${url}`)
             return { title, url }
         })
     console.log(`세부 목록 ${JSON.stringify(detailArr)}`)
     return detailArr
-
 }
 
 function wait(time) {
@@ -102,22 +105,21 @@ function wait(time) {
     })
 }
 
+//페이지가 바로 로딩이 안되서 스크롤로 조금씩 내려가서 이미지 로딩 유도
 async function scrollAction(page) {
-    //페이지가 바로 로딩이 안되서 스크롤 액션 실행
     const scrollHeight = 'document.body.scrollHeight';
     let previousHeight = await page.evaluate(scrollHeight);
     const per = previousHeight / 10
-    console.log(`scrollHeight : ${previousHeight}`)
 
     await page.evaluate(async (per) => {
         let promise = Promise.resolve()
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 10; i++) {
             promise = promise.then(() => {
                 return new Promise(res => {
                     setTimeout(() => {
                         window.scrollTo(i * per, (i + 1) * per)
                         res(i)
-                    }, 200);
+                    }, 100);
                 })
             })
         }
@@ -125,61 +127,62 @@ async function scrollAction(page) {
     }, (per));
 }
 
+//브라우저로 이미지가 로딩될때까지 기다림
 async function browserWaitForImgLoading(page) {
     await scrollAction(page)
     await page.waitForSelector('div.view-padding');
 }
 
+//브라우저 시작 및 해당 url로 이동
 async function loadingBrowser(url) {
     const puppeteer = require('puppeteer')
     const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--window-size=500,500'] });
     const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(120000)
     page.setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/66.0.3359.181 Safari/537.36WAIT_UNTIL=load")
     await page.goto(url, { waitUntil: 'networkidle0' })
     return page
 }
 
 
-async function getImgs(url, count = 0, currentPage) {
+async function getImgs(title, url, count = 0, currentPage) {
 
     let downImgs = [];
 
     try {
         if (count === 3) throw new Error('3회 초과')
-
         const page = currentPage || await loadingBrowser(url)
         await browserWaitForImgLoading(page)
         const content = await page.content()
         const $ = cheerio.load(content)
-        const imgArr = Array.from($('div.view-padding img')).map(data=>$(data).attr('src'))
+        const imgArr = Array.from($('div.view-padding img')).map(data => $(data).attr('src'))
 
         const isLoading = imgArr.find(data => data.includes('loading-image'))
         //크롤링 햇을때 이미지가 아직 로딩중이라면...
         if (isLoading) {
-            await page.reload({ waitUntil: ['networkidle2'] });
-            getImgs(url, ++count, page)
+            await page.reload({ waitUntil: ['networkidle0'] });
+            return getImgs(title, url, ++count, page)
         } else {
             downImgs = Array.from($('div.view-padding div'))
                 .filter(data => $(data).attr('id') !== 'html_encoder_div') // 다른 만화 이미지까지 추가되는 html이라 거름
                 .map(data => {
                     //jquery 배열에서 일반 Array 로 수정해야 String 리스트가 뽑혀져 나옴
                     return Array.from($(data).find('img'))
-                    .map(data=>{
-                        return $(data).attr('src')
-                    })
+                        .map(data => {
+                            return $(data).attr('src')
+                        })
                 })
                 .reduce((acc, imgs) => {
                     const divImgs = imgs || []
                     if (acc.length <= divImgs.length) return divImgs
                     return acc
                 }, [])
-
-            console.log(`다운 받을 이미지 목록 : ${downImgs}`)
         }
-        return downImgs;
+        if (page) page.browser().close()
+        return { title: title, data: downImgs };
     } catch (err) {
         console.error(`이미지 불러오기 실패 ${err}`)
-        return []
+        return { title: title, data: [] }
     }
 }
 
@@ -194,12 +197,11 @@ async function crawlingSite(query) {
             const tempTitle = searchPage[0].title || ''
             const detailSite = await getDetailPageInfo(tempTitle, tempUrl)
 
-            Async.mapLimit(detailSite, 5, async ({ url, title }) => {
-                return await getImgs(url)
-            })
-            .then(data => {
-                console.log(data)
-            })
+            const downloadImgArr = await Async
+                .mapLimit(detailSite.splice(0, 10), 10, async ({ title, url }) => await getImgs(title, url))
+                .catch(err => console.log(`downloadImgArr err : ${err}`))
+
+            console.log(`총 다운 받은 이미지 리스트 : ${downloadImgArr}`)
         }
     } catch (err) {
         console.error(`crawlingSite err : ${err}`)
