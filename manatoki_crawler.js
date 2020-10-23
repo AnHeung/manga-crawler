@@ -2,28 +2,6 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const Async = require('async');
 
-// https://manatoki81.net/bbs/search.php?stx=%ED%82%B9%EB%8D%A4
-
-
-async function test() {
-
-    const arr = []
-    let promise = Promise.resolve()
-
-    for (let i = 0; i < 10; i++) {
-        promise = promise
-            .then(() => {
-                return new Promise(res => {
-                    setTimeout(() => {
-                        res(i)
-                    }, 1000);
-                })
-            })
-    }
-    return promise;
-}
-
-
 async function checkSite(query) {
 
     let promise = Promise.resolve()
@@ -133,7 +111,7 @@ async function scrollAction(page) {
 
     await page.evaluate(async (per) => {
         let promise = Promise.resolve()
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 5; i++) {
             promise = promise.then(() => {
                 return new Promise(res => {
                     setTimeout(() => {
@@ -164,12 +142,16 @@ async function loadingBrowser(url) {
 
 async function getImgs(url, count = 0, currentPage) {
 
+    let downImgs = [];
+
     try {
         if (count === 3) throw new Error('3회 초과')
 
         const page = currentPage || await loadingBrowser(url)
         await browserWaitForImgLoading(page)
-        const imgArr = await page.evaluate(() => Array.from(document.querySelectorAll('div.view-padding img')).map(data => data.src))
+        const content = await page.content()
+        const $ = cheerio.load(content)
+        const imgArr = Array.from($('div.view-padding img')).map(data=>$(data).attr('src'))
 
         const isLoading = imgArr.find(data => data.includes('loading-image'))
         //크롤링 햇을때 이미지가 아직 로딩중이라면...
@@ -177,25 +159,27 @@ async function getImgs(url, count = 0, currentPage) {
             await page.reload({ waitUntil: ['networkidle2'] });
             getImgs(url, ++count, page)
         } else {
-            const content = await page.content()
-            const $ = await cheerio.load(content)
-            const downImgs = Array.from($('div.view-padding div'))
+            downImgs = Array.from($('div.view-padding div'))
                 .filter(data => $(data).attr('id') !== 'html_encoder_div') // 다른 만화 이미지까지 추가되는 html이라 거름
                 .map(data => {
-                    return $(data).find('img')
+                    //jquery 배열에서 일반 Array 로 수정해야 String 리스트가 뽑혀져 나옴
+                    return Array.from($(data).find('img'))
+                    .map(data=>{
+                        return $(data).attr('src')
+                    })
                 })
                 .reduce((acc, imgs) => {
                     const divImgs = imgs || []
                     if (acc.length <= divImgs.length) return divImgs
                     return acc
                 }, [])
-                .map(data=>$(data).attr('src'))
 
             console.log(`다운 받을 이미지 목록 : ${downImgs}`)
-            return downImgs;
         }
+        return downImgs;
     } catch (err) {
         console.error(`이미지 불러오기 실패 ${err}`)
+        return []
     }
 }
 
@@ -210,14 +194,12 @@ async function crawlingSite(query) {
             const tempTitle = searchPage[0].title || ''
             const detailSite = await getDetailPageInfo(tempTitle, tempUrl)
 
-            Async.mapLimit(detailSite, 10, async ({ url, title }) => {
+            Async.mapLimit(detailSite, 5, async ({ url, title }) => {
                 return await getImgs(url)
             })
-                .then(data => {
-                    console.log(data)
-                })
-
-
+            .then(data => {
+                console.log(data)
+            })
         }
     } catch (err) {
         console.error(`crawlingSite err : ${err}`)
@@ -225,5 +207,5 @@ async function crawlingSite(query) {
 }
 
 (async () => {
-    crawlingSite('타카기')
+    crawlingSite('킹덤')
 })()
