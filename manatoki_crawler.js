@@ -96,7 +96,7 @@ async function getDetailPageInfo(tempTitle, tempUrl) {
     console.log(`세부 목록 ${JSON.stringify(detailArr)}`)
     return detailArr
 }
-//test
+
 function wait(time) {
     return new Promise(res => {
         setTimeout(() => {
@@ -151,6 +151,7 @@ async function getImgs(title, url, count = 0, currentPage) {
 
     try {
         if (count === 3) throw new Error('3회 초과')
+
         const page = currentPage || await loadingBrowser(url)
         await browserWaitForImgLoading(page)
         const content = await page.content()
@@ -179,6 +180,7 @@ async function getImgs(title, url, count = 0, currentPage) {
                 }, [])
         }
         if (page) page.browser().close()
+        console.log(`downImg : ${downImgs}`)
         return { title: title, data: downImgs };
     } catch (err) {
         console.error(`이미지 불러오기 실패 ${err}`)
