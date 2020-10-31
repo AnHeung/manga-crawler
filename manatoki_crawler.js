@@ -6,59 +6,59 @@ const Async = require('async');
 //최근 성공했던 숫자 기준으로 총 3회 숫자올려서 검사 (사이트 주소가 자주 바뀌기 때문에)
 async function checkSite(query) {
 
-    let promise = Promise.resolve()
     //나중에 몽고디비에서 조회할 예정
-    let siteNo = 82
-    let errCount = 0
-    let completeSign = false
+    const siteNo = 81;
 
-    for (let i = 0; i < 3; i++) {
-
-        promise = promise
-            .then(async (resultArr = []) => {
-
-                return new Promise((res, rej) => {
-
-                    if (completeSign) return res(resultArr)
-
-                    setTimeout(async () => {
-                        let site = `https://manatoki${siteNo}.net/bbs/search.php?`
-                        console.log(`접속 시도 사이트 ${site}`)
-                        const page = await axios.get(site, { params: { stx: query }, timeout: 10000 })
-                            .catch(err => {
-                                console.error(`통신 에러 : ${err}`)
-                                if (errCount === 3) {
-                                    console.error('3회 오류')
-                                    resultArr.push({ err: true, errMsg: `${errCount}회 오류` })
-                                    return res(resultArr)
-                                } else {
-                                    errCount++
-                                    siteNo++
-                                }
-                            })
-                        if (page) {
-                            resultArr.push({ err: false, page: page })
-                            completeSign = true
-                        } else {
-                            resultArr.push({ err: true, errMsg: `${errCount}회 오류` })
-                        }
-                        res(resultArr)
-                    }, 2000);
-                })
-            })
-    }
-    return promise
-        .then(resultArr => resultArr.find(result => !result.err))
+    return retry(0, 3, connectSite, { siteNo, query })
+        .then(data=>data.page)
         .catch(err => {
             console.error(`getSiteInfo 에러 ${err}`)
             return false
         })
 }
 
-//검색 페이지 리스트
-async function getSearchPageInfo(pageInfo) {
+async function connectSite(params) {
 
-    const page = pageInfo.page
+    return new Promise(async (res, rej) => {
+
+        setTimeout(async () => {
+      
+            const siteNo = params.siteNo + params.n
+            const query = params.query
+
+            let site = `https://manatoki${siteNo}.net/bbs/search.php?`
+            console.log(`접속 시도 사이트 ${site}`)
+            const page = await axios.get(site, { params: { stx: query }, timeout: 10000 })
+                .catch(err => {
+                    console.error('통신 에러 ')
+                })
+            if (page) return res({ err: false, page: page })
+            else return rej({ err: true, errMsg: `오류 ${page}` })
+        }, 2000);
+    })
+}
+
+
+async function retry(n = 0, tryCount, promise, params) {
+    
+    return new Promise((res, rej) => {
+
+        if(tryCount  === n) return rej()
+
+        promise({ ...params, n })
+            .then(data => {
+                res(data)
+            })
+            .catch(err => {
+                retry(n + 1 , tryCount, promise, {...params, n}).then(res).catch(err => rej)
+            })
+    })
+
+}
+
+//검색 페이지 리스트
+async function getSearchPageInfo(page) {
+
     const $ = cheerio.load(page.data, { ignoreWhitespace: true })
 
     //해당 쿼리로 검색시 나오는 목록
@@ -191,9 +191,9 @@ async function getImgs(title, url, count = 0, currentPage) {
 async function crawlingSite(query) {
 
     try {
-        const pageInfo = await checkSite(query)
-        if (pageInfo) {
-            const searchPage = await getSearchPageInfo(pageInfo)
+        const page = await checkSite(query)
+        if (page) {
+            const searchPage = await getSearchPageInfo(page)
             //지금은 임시로 지정 추후 클라쪽 개발하면 검색해서 해당 아이템 클릭하면 검색하는식으로 
             const tempUrl = searchPage[0].url || ''
             const tempTitle = searchPage[0].title || ''
