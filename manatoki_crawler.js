@@ -46,14 +46,13 @@ async function retry(n = 0, tryCount, promise, params) {
         if(tryCount  === n) return rej()
 
         promise({ ...params, n })
-            .then(data => {
-                res(data)
-            })
+            .then(data => res(data))
             .catch(err => {
-                retry(n + 1 , tryCount, promise, {...params, n}).then(res).catch(err => rej)
+                retry(n + 1 , tryCount, promise, {...params, n})
+                .then(res)
+                .catch(err =>rej)
             })
     })
-
 }
 
 //검색 페이지 리스트
