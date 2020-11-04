@@ -1,56 +1,124 @@
 const axios = require('axios');
 const cheerio = require('cheerio');
 const Async = require('async');
+const moment = require('moment');
+const { sendSlackMsg } = require('./manatoki_scheduler');
+const searchPage = 'https://manatoki84.net/bbs/search.php?'
+const updatePage = 'https://manatoki84.net/page/update'
 
 
 //최근 성공했던 숫자 기준으로 총 3회 숫자올려서 검사 (사이트 주소가 자주 바뀌기 때문에)
-async function checkSite(query) {
+async function checkSite(site, query, retryCount = 3) {
 
     //나중에 몽고디비에서 조회할 예정
-    const siteNo = 81;
+    const siteNo = 83;
 
-    return retry(0, 3, connectSite, { siteNo, query })
-        .then(data=>data.page)
-        .catch(err => {
-            console.error(`getSiteInfo 에러 ${err}`)
+    return retry(0, retryCount, connectSite, { site, siteNo, query })
+        .then(data => data.page)
+        .catch(e => {
+            console.error(`getSiteInfo 에러 ${e}`)
             return false
         })
 }
 
+//오늘 데이터 뽑아오기(모든 페이지)
+async function getTodayUpdateData(site, query, currentPage = 1, totalDataArr = []) {
+
+    const page = await checkSite(site, query)
+
+    if (page) {
+        const isToday = isTodayPage(page)
+        const todayPageData = getTodayPageData(page)
+        totalDataArr = [...totalDataArr, ...todayPageData]
+        if (isToday) {
+            query.page = ++currentPage
+            return getTodayUpdateData(site, query, currentPage, totalDataArr)
+        } else {
+            return totalDataArr;
+        }
+    } else {
+        console.error('getTodayUpdateData : 페이지 읽기 실패')
+    }
+}
+
+//해당 페이지에서 오늘 데이터 뽑아오기
+function getTodayPageData(page) {
+
+    const $ = cheerio.load(page.data, { ignoreWhitespace: true })
+
+    return Array.from($('div.post-row'))
+        .map(data => $(data))
+        .filter(data => {
+            const todayFormat = moment(new Date()).format('MM-DD')
+            const isToday = data.find('span.txt-normal').text()
+                ? data.find('span.txt-normal').text().includes(todayFormat)
+                : false
+            return isToday
+        })
+        .map(data => {
+            const title = /.*화/.exec(data.find('div.post-subject a').text())
+                ? /.*화/.exec(data.find('div.post-subject a').text()).toString()
+                : data.find('div.post-subject a').text()
+            const link = data.find('div.post-subject a').attr('href') || ''
+            const date = data.find('span.txt-normal').text() || moment(new Date()).format('MM-DD')
+            const thumbnail = data.find('div.img-wrap img').attr('src')
+            return { title, link, date, thumbnail }
+        })
+}
+
+//업데이트 페이지에서 오늘데이터가 없는지 체크
+function isTodayPage(page) {
+
+    const $ = cheerio.load(page.data, { ignoreWhitespace: true })
+
+    return Array.from($('div.post-row'))
+        .map(data => $(data))
+        .every(data => {
+            const todayFormat = moment(new Date()).format('MM-DD')
+            const isToday = data.find('span.txt-normal').text()
+                ? data.find('span.txt-normal').text().includes(todayFormat)
+                : false
+            return isToday
+        })
+}
+
+//해당 주소로 접속 시도 
 async function connectSite(params) {
 
     return new Promise(async (res, rej) => {
 
         setTimeout(async () => {
-      
+
             const siteNo = params.siteNo + params.n
             const query = params.query
+            let site = params.site
+            site = site.replace(/\d+(?=\.net)/, siteNo)
 
-            let site = `https://manatoki${siteNo}.net/bbs/search.php?`
             console.log(`접속 시도 사이트 ${site}`)
-            const page = await axios.get(site, { params: { stx: query }, timeout: 10000 })
-                .catch(err => {
-                    console.error('통신 에러 ')
+            const page = await axios.get(site, { params: query, timeout: 10000 })
+                .catch(e => {
+                    console.error(`axios 통신 에러 ${e}`)
                 })
             if (page) return res({ err: false, page: page })
-            else return rej({ err: true, errMsg: `오류 ${page}` })
+            else rej({ err: true, errMsg: `오류 ${page}` })
         }, 2000);
     })
 }
 
 
+//지정된 숫자만큼 사이트 접속시도
 async function retry(n = 0, tryCount, promise, params) {
-    
+
     return new Promise((res, rej) => {
 
-        if(tryCount  === n) return rej()
+        if (tryCount === n) return rej()
 
         promise({ ...params, n })
-            .then(data => {
-                res(data)
-            })
-            .catch(err => {
-                retry(n + 1 , tryCount, promise, {...params, n}).then(res).catch(err => rej)
+            .then(res)
+            .catch(e => {
+                retry(n + 1, tryCount, promise, { ...params, n })
+                    .then(res)
+                    .catch(e => rej)
             })
     })
 
@@ -88,7 +156,9 @@ async function getDetailPageInfo(tempTitle, tempUrl) {
         .map(raw => $(raw))
         .map(data => {
             const regex = new RegExp(tempTitle + '.*화', "gi")
-            const title = regex.exec(data.find('a').text()).toString() || ''
+            const title = regex.exec(data.find('a').text())
+                ? regex.exec(data.find('a').text()).toString()
+                : '제목없음'
             const url = data.find('a').attr('href') || ''
             console.log(`title :${title} ,  url : ${url}`)
             return { title, url }
@@ -188,10 +258,10 @@ async function getImgs(title, url, count = 0, currentPage) {
     }
 }
 
-async function crawlingSite(query) {
+async function crawlingSite(site, query) {
 
     try {
-        const page = await checkSite(query)
+        const page = await checkSite(site, query)
         if (page) {
             const searchPage = await getSearchPageInfo(page)
             //지금은 임시로 지정 추후 클라쪽 개발하면 검색해서 해당 아이템 클릭하면 검색하는식으로 
@@ -211,5 +281,7 @@ async function crawlingSite(query) {
 }
 
 (async () => {
-    crawlingSite('킹덤')
+    // crawlingSite(updatePage,{stx:'킹덤'})
+    const todayData = await getTodayUpdateData(updatePage, { page: 1 })
+    sendSlackMsg(todayData)
 })()
