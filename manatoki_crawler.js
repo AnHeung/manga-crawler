@@ -28,7 +28,7 @@ async function getTodayUpdateData(site, query, currentPage = 1, totalDataArr = [
 
     if (page) {
         const isToday = isTodayPage(page)
-        const todayPageData = getTodayPageData(page)
+        const todayPageData = getTodayUpdatePageData(page)
         totalDataArr = [...totalDataArr, ...todayPageData]
         if (isToday) {
             query.page = ++currentPage
@@ -41,20 +41,12 @@ async function getTodayUpdateData(site, query, currentPage = 1, totalDataArr = [
     }
 }
 
-//해당 페이지에서 오늘 데이터 뽑아오기
-function getTodayPageData(page) {
+function getUpdatePageData(page){
 
     const $ = cheerio.load(page.data, { ignoreWhitespace: true })
 
     return Array.from($('div.post-row'))
         .map(data => $(data))
-        .filter(data => {
-            const todayFormat = moment(new Date()).format('MM-DD')
-            const isToday = data.find('span.txt-normal').text()
-                ? data.find('span.txt-normal').text().includes(todayFormat)
-                : false
-            return isToday
-        })
         .map(data => {
             const title = /.*화/.exec(data.find('div.post-subject a').text())
                 ? /.*화/.exec(data.find('div.post-subject a').text()).toString()
@@ -62,7 +54,26 @@ function getTodayPageData(page) {
             const link = data.find('div.post-subject a').attr('href') || ''
             const date = data.find('span.txt-normal').text() || moment(new Date()).format('MM-DD')
             const thumbnail = data.find('div.img-wrap img').attr('src')
-            return { title, link, date, thumbnail }
+            const comicLink = data.find('div.post-info a').attr('href')
+            
+
+            return { title, link, date, thumbnail , comicLink}
+        })
+
+}
+
+//해당 페이지에서 오늘 데이터 뽑아오기
+function getTodayUpdatePageData(page) {
+
+    const currentUpdatePage = getUpdatePageData(page)
+
+    return currentUpdatePage
+        .filter(({date}) => {
+            const todayFormat = moment(new Date()).format('MM-DD')
+            const isToday = date
+                ? date.includes(todayFormat)
+                : false
+            return isToday
         })
 }
 
@@ -213,7 +224,7 @@ async function loadingBrowser(url) {
     return page
 }
 
-
+//만화페이지에서 이미지 목록 받아오기
 async function getImgs(title, url, count = 0, currentPage) {
 
     let downImgs = [];
@@ -257,6 +268,7 @@ async function getImgs(title, url, count = 0, currentPage) {
     }
 }
 
+//만화 조회해서 총 만화목록 긁어오는 로직
 async function crawlingSite(site, query) {
 
     try {

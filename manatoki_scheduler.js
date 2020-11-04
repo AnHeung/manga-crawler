@@ -33,7 +33,7 @@ function makeBlocks(mangaData) {
 
     return blocks = mangaData.reduce((acc, data) => {
 
-        const { title, link, date, thumbnail } = data
+        const { title, link, date, thumbnail, comicLink } = data
         acc.push({
             "type": "section",
             "text": {
@@ -54,7 +54,7 @@ function makeAttachment(mangaData) {
 
     return mangaData.reduce((acc, data) => {
 
-        const { title, link, date, thumbnail } = data
+        const { title, link, date, thumbnail ,comicLink} = data
 
         const attchment =  // attachments, here we also use long attachment to use more space
         {
@@ -78,6 +78,12 @@ function makeAttachment(mangaData) {
                     "type": "button",
                     "text": "보러가기", // text on the button 
                     "url": link // url the button will take the user if clicked
+                },
+                {
+                    "type": "button",
+                    "text": "전편보기", // text on the button 
+                    "style": "danger",
+                    "url": comicLink // url the button will take the user if clicked
                 },
                 {
                     "type": "button",
