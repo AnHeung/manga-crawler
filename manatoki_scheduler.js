@@ -17,7 +17,6 @@ const send = async (message) => {
     });
 }
 
-
 exports.sendSlackMsg = async (mangaData) => {
 
     const result = await Axios.post(webHookUrl, JSON.stringify(configMessageBody(mangaData)))
@@ -38,7 +37,7 @@ function makeBlocks(mangaData) {
             "type": "section",
             "text": {
                 "type": "mrkdwn",
-                "text": `<${link}> \n ${title} \n ${date}`
+                "text": `<${link}> \n ${title} \n ${date}`  
             },
             "accessory": {
                 "type": "image",
@@ -50,11 +49,37 @@ function makeBlocks(mangaData) {
     }, [])
 }
 
+function makeUrlLink (params){
+
+    const batchLink = 'https://5e401b8b8eb0.ngrok.io/manatoki/batch'
+    
+    const keyArr = Object.keys(params)
+    
+    let isFirst = true
+
+    const url =  keyArr.reduce((acc, key)=>{
+        
+        const value = params[key]
+
+        if(isFirst){
+           acc = `${acc}?${key}=${value}`
+           isFirst = false
+        }else{
+            acc = `${acc}&${key}=${value}`
+        }
+        return acc
+    },batchLink)
+
+    return encodeURI(url)
+}
+
 function makeAttachment(mangaData) {
 
     return mangaData.reduce((acc, data) => {
 
         const { title, link, date, thumbnail ,comicLink} = data
+       
+        const registerBatchLink = makeUrlLink(data)
 
         const attchment =  // attachments, here we also use long attachment to use more space
         {
@@ -95,10 +120,11 @@ function makeAttachment(mangaData) {
                     "type": "button",
                     "text": "배치추가", // text on the button 
                     "style": "danger",
-                    "url": link // url the button will take the user if clicked
+                    "url": registerBatchLink // url the button will take the user if clicked
                 }
             ]
         }
+        
         acc.push(attchment)
 
         return acc;
@@ -107,7 +133,7 @@ function makeAttachment(mangaData) {
 
 function configMessageBody(mangaData) {
 
-    const attchment = makeAttachment(mangaData)
+    const attchment = makeAttachment(mangaData  )
 
     return {
         "attachments": attchment

@@ -5,13 +5,12 @@ const moment = require('moment');
 const { sendSlackMsg } = require('./manatoki_scheduler');
 const searchPage = 'https://manatoki84.net/bbs/search.php?'
 const updatePage = 'https://manatoki84.net/page/update'
-
+const { saveSuccessNo, getSuccssNo } = require('./util/files')
 
 //최근 성공했던 숫자 기준으로 총 3회 숫자올려서 검사 (사이트 주소가 자주 바뀌기 때문에)
 async function checkSite(site, query, retryCount = 3) {
 
-    //나중에 몽고디비에서 조회할 예정
-    const siteNo = 83;
+    const siteNo = await getSuccssNo();
 
     return retry(0, retryCount, connectSite, { site, siteNo, query })
         .then(data => data.page)
@@ -28,7 +27,7 @@ async function getTodayUpdateData(site, query, currentPage = 1, totalDataArr = [
 
     if (page) {
         const isToday = isTodayPage(page)
-        const todayPageData = getTodayUpdatePageData(page)
+        const todayPageData = await getTodayUpdatePageData(page)
         totalDataArr = [...totalDataArr, ...todayPageData]
         if (isToday) {
             query.page = ++currentPage
@@ -41,37 +40,63 @@ async function getTodayUpdateData(site, query, currentPage = 1, totalDataArr = [
     }
 }
 
-function getUpdatePageData(page){
+async function getUpdatePageData(page) {
 
     const $ = cheerio.load(page.data, { ignoreWhitespace: true })
 
-    return Array.from($('div.post-row'))
+    return Promise.all(Array.from($('div.post-row'))
         .map(data => $(data))
-        .map(data => {
+        .map(async data => {
+
+            const comicLink = data.find('div.post-info a').attr('href')
+            const comicPageData = await getComicPageData(comicLink)
+
             const title = /.*화/.exec(data.find('div.post-subject a').text())
                 ? /.*화/.exec(data.find('div.post-subject a').text()).toString()
                 : data.find('div.post-subject a').text()
             const link = data.find('div.post-subject a').attr('href') || ''
-            const date = data.find('span.txt-normal').text() || moment(new Date()).format('MM-DD')
+            const uploadDate = data.find('span.txt-normal').text() || moment(new Date()).format('MM-DD')
             const thumbnail = data.find('div.img-wrap img').attr('src')
-            const comicLink = data.find('div.post-info a').attr('href')
-            
 
-            return { title, link, date, thumbnail , comicLink}
-        })
+            return { title, link, uploadDate, thumbnail, comicLink }
+        }))
+}
+
+async function getComicPageData(siteUrl) {
+
+    const site = await axios.get(siteUrl)
+        .catch(e => console.error(`axios err : ${e}`))
+
+    if (site) {
+        const $ = cheerio.load(site.data)
+
+        const title = Array.from($('meta'))
+            .filter(data => $(data).attr('name') === 'subject')
+            .map(data => $(data).attr('content'))
+
+        const test = Array.from($('div.col-md-10 div.view-content'))
+            .filter(data => $(data).find('strong').text())
+            .map(data=>{
+                return $(data).find('a')
+            })
+
+
+
+
+    }
 
 }
 
 //해당 페이지에서 오늘 데이터 뽑아오기
-function getTodayUpdatePageData(page) {
+async function getTodayUpdatePageData(page) {
 
-    const currentUpdatePage = getUpdatePageData(page)
+    const currentUpdatePage = await getUpdatePageData(page)
 
     return currentUpdatePage
-        .filter(({date}) => {
+        .filter(({ uploadDate }) => {
             const todayFormat = moment(new Date()).format('MM-DD')
-            const isToday = date
-                ? date.includes(todayFormat)
+            const isToday = uploadDate
+                ? uploadDate.includes(todayFormat)
                 : false
             return isToday
         })
@@ -110,8 +135,12 @@ async function connectSite(params) {
                 .catch(e => {
                     console.error(`axios 통신 에러 ${e}`)
                 })
-            if (page) return res({ err: false, page: page })
-            else rej({ err: true, errMsg: `오류 ${page}` })
+            if (page) {
+                saveSuccessNo(siteNo)
+                return res({ err: false, page: page })
+            } else {
+                rej({ err: true, errMsg: `오류 ${page}` })
+            }
         }, 2000);
     })
 }
@@ -126,10 +155,10 @@ async function retry(n = 0, tryCount, promise, params) {
 
         promise({ ...params, n })
             .then(res)
-            .catch(err => {
+            .catch(e => {
                 retry(n + 1, tryCount, promise, { ...params, n })
                     .then(res)
-                    .catch(err => rej)
+                    .catch(e => rej)
             })
     })
 }
