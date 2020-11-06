@@ -49,6 +49,7 @@ function makeBlocks(mangaData) {
     }, [])
 }
 
+//링크보내기가 get 방식으로 밖에 안되서 조립하는 로직
 function makeUrlLink (params){
 
     const batchLink = 'https://5e401b8b8eb0.ngrok.io/manatoki/batch'
@@ -126,7 +127,6 @@ function makeAttachment(mangaData) {
         }
         
         acc.push(attchment)
-
         return acc;
     }, [])
 }
@@ -139,96 +139,3 @@ function configMessageBody(mangaData) {
         "attachments": attchment
     }
 }
-
-const messageBody2 = {
-    "text": "Danny Torrence left a 1 star review for your property.",
-    "blocks": [
-        {
-            "type": "section",
-            "text": {
-                "type": "mrkdwn",
-                "text": "Danny Torrence left the following review for your property:"
-            }
-        },
-        {
-            "type": "section",
-            "block_id": "section567",
-            "text": {
-                "type": "mrkdwn",
-                "text": "<https://example.com|Overlook Hotel> \n :star: \n Doors had too many axe holes, guest in room 237 was far too rowdy, whole place felt stuck in the 1920s."
-            },
-            "accessory": {
-                "type": "image",
-                "image_url": "https://is5-ssl.mzstatic.com/image/thumb/Purple3/v4/d3/72/5c/d3725c8f-c642-5d69-1904-aa36e4297885/source/256x256bb.jpg",
-                "alt_text": "Haunted hotel image"
-            }
-        },
-        {
-            "type": "section",
-            "block_id": "section789",
-            "fields": [
-                {
-                    "type": "mrkdwn",
-                    "text": "*Average Rating*\n1.0"
-                }
-            ]
-        }
-    ]
-}
-
-const messageBody = {
-    "username": "Order notifier",
-    "text": "New order <!everyone> <!here> <@hpeinar>", // <> are used for linking
-    "icon_emoji": ":moneybag:",
-    "attachments": [ // attachments, here we also use long attachment to use more space
-        {
-            "color": "#2eb886",
-            "fields": [
-                {
-                    "title": "Environment",
-                    "value": "Production",
-                    "short": true
-                },
-                {
-                    "title": "Value",
-                    "value": "4€",
-                    "short": true
-                },
-                {
-                    "title": "User ID",
-                    "value": "6",
-                    "short": true
-                },
-                {
-                    "title": "Product",
-                    "value": "Awesome Product",
-                    "short": true
-                },
-                {
-                    "title": "Additional notes from user",
-                    "value": "Extra long notes from the user about important things.",
-                    "short": false // marks this to be wide attachment
-                }
-            ],
-            "actions": [ // Slack supports many kind of different types, we'll use buttons here
-                {
-                    "type": "button",
-                    "text": "Show order", // text on the button 
-                    "url": "http://example.com" // url the button will take the user if clicked
-                },
-                {
-                    "type": "button",
-                    "text": "Handle delivery",
-                    "style": "primary", // you can have buttons styled either primary or danger
-                    "url": "http://example.com"
-                },
-                {
-                    "type": "button",
-                    "text": "Cancel order",
-                    "style": "danger",
-                    "url": "http://example.com/order/1/cancel"
-                }
-            ]
-        }
-    ]
-};
