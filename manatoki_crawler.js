@@ -26,10 +26,9 @@ async function getTodayUpdateData(site, query, currentPage = 1, totalDataArr = [
     const page = await checkSite(site, query)
 
     if (page) {
-        const isToday = isTodayPage(page)
         const todayPageData = await getTodayUpdatePageData(page)
         totalDataArr = [...totalDataArr, ...todayPageData]
-        if (isToday) {
+        if (isTodayPage(page)) {
             query.page = ++currentPage
             return getTodayUpdateData(site, query, currentPage, totalDataArr)
         } else {
@@ -49,7 +48,9 @@ async function getUpdatePageData(page) {
         .map(async data => {
 
             const comicLink = data.find('div.post-info a').attr('href')
-            const comicPageData = await getComicPageData(comicLink)
+           
+            //자꾸 403 forbidden 걸림 천천히 긁어와야 하나...
+            // const comicPageData = await getComicPageData(comicLink)
 
             const title = /.*화/.exec(data.find('div.post-subject a').text())
                 ? /.*화/.exec(data.find('div.post-subject a').text()).toString()
@@ -79,10 +80,6 @@ async function getComicPageData(siteUrl) {
             .map(data=>{
                 return $(data).find('a')
             })
-
-
-
-
     }
 
 }

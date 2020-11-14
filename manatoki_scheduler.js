@@ -52,13 +52,13 @@ function makeBlocks(mangaData) {
 //링크보내기가 get 방식으로 밖에 안되서 조립하는 로직
 function makeUrlLink (params){
 
-    const batchLink = 'https://5e401b8b8eb0.ngrok.io/manatoki/batch'
+    const batchLink = 'localhost:4500/manatoki/batch'
     
-    const keyArr = Object.keys(params)
+    const keyValueArr = Object.keys(params)
     
     let isFirst = true
 
-    const url =  keyArr.reduce((acc, key)=>{
+    const url =  keyValueArr.reduce((acc, key)=>{
         
         const value = params[key]
 
