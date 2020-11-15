@@ -1,25 +1,10 @@
-const webHookUrl = 'https://hooks.slack.com/services/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'
-const channel = '#manatoki_scheduler'
-const username = "tester"
-const Slack = require('slack-node');
 const Axios = require('axios');
+require('dotenv').config();
 
-
-const slack = new Slack();
-slack.setWebhook(webHookUrl);
-const send = async (message) => {
-    slack.webhook({
-        channel, // 전송될 슬랙 채널
-        username, //슬랙에 표시될 이름
-        text: message
-    }, function (err, response) {
-        console.log(response);
-    });
-}
 
 exports.sendSlackMsg = async (mangaData) => {
 
-    const result = await Axios.post(webHookUrl, JSON.stringify(configMessageBody(mangaData)))
+    const result = await Axios.post(process.env.WEBHOOK_URL, JSON.stringify(configMessageBody(mangaData)))
         .catch(err => {
             console.error(err)
         })
@@ -32,7 +17,7 @@ function makeBlocks(mangaData) {
 
     return blocks = mangaData.reduce((acc, data) => {
 
-        const { title, link, date, thumbnail, comicLink } = data
+        const { title, link, date, thumbnail } = data
         acc.push({
             "type": "section",
             "text": {
@@ -52,8 +37,6 @@ function makeBlocks(mangaData) {
 //링크보내기가 get 방식으로 밖에 안되서 조립하는 로직
 function makeUrlLink (params){
 
-    const batchLink = 'localhost:4500/manatoki/batch'
-    
     const keyValueArr = Object.keys(params)
     
     let isFirst = true
@@ -69,7 +52,7 @@ function makeUrlLink (params){
             acc = `${acc}&${key}=${value}`
         }
         return acc
-    },batchLink)
+    },process.env.BATCH_API_URL)
 
     return encodeURI(url)
 }
