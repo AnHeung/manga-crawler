@@ -29,6 +29,7 @@ exports.getSuccssNo = async () => {
 
     const fileExist = await isFileExist()
 
+    
     if (fileExist) {
         const json = fs.readFileSync(defaultPath, 'utf-8')
         if (json) return JSON.parse(json).successNo
