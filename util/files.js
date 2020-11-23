@@ -33,10 +33,10 @@ exports.getSuccssNo = async () => {
     if (fileExist) {
         const json = fs.readFileSync(defaultPath, 'utf-8')
         if (json) return JSON.parse(json).successNo
-        return 84
+        return 87
     } else {
         await this.saveSuccessNo()
-        return 84
+        return 87
     }
 }
 

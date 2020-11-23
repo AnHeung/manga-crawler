@@ -3,8 +3,8 @@ const cheerio = require('cheerio');
 const Async = require('async');
 const moment = require('moment');
 const { sendSlackMsg } = require('./manatoki_scheduler');
-const searchPage = 'https://manatoki84.net/bbs/search.php?'
-const updatePage = 'https://manatoki84.net/page/update'
+const searchPage = 'https://manatoki87.net/bbs/search.php?'
+const updatePage = 'https://manatoki87.net/page/update'
 const { saveSuccessNo, getSuccssNo } = require('./util/files')
 
 //최근 성공했던 숫자 기준으로 총 3회 숫자올려서 검사 (사이트 주소가 자주 바뀌기 때문에)
@@ -128,7 +128,7 @@ async function connectSite(params) {
             site = site.replace(/\d+(?=\.net)/, siteNo)
 
             console.log(`접속 시도 사이트 ${site}`)
-            const page = await axios.get(site, { params: query, timeout: 10000 })
+            const page = await axios.get(site, { params: query, timeout: 15000 })
                 .catch(e => {
                     console.error(`axios 통신 에러 ${e}`)
                 })
