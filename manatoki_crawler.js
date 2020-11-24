@@ -53,12 +53,12 @@ async function getUpdatePageData(page) {
             // const comicPageData = await getComicPageData(comicLink)
 
             const title = /.*화/.exec(data.find('div.post-subject a').text())
-                ? /.*화/.exec(data.find('div.post-subject a').text()).toString()
-                : data.find('div.post-subject a').text()
+                ? /.*화/.exec(data.find('div.post-subject a').text().replace(/([\t|\n|\s])/gi, "")).toString()
+                : data.find('div.post-subject a').text().replace(/([\t|\n|\s])/gi, "").toString()
             const link = data.find('div.post-subject a').attr('href') || ''
             const uploadDate = data.find('span.txt-normal').text() || moment(new Date()).format('MM-DD')
             const thumbnail = data.find('div.img-wrap img').attr('src')
-
+            
             return { title, link, uploadDate, thumbnail, comicLink }
         }))
 }
