@@ -6,6 +6,7 @@ const { sendSlackMsg } = require('./manatoki_scheduler');
 const searchPage = 'https://manatoki87.net/bbs/search.php?'
 const updatePage = 'https://manatoki87.net/page/update'
 const { saveSuccessNo, getSuccssNo } = require('./util/files')
+const { getManatokiBatchList } = require('./repository/repository');
 
 //최근 성공했던 숫자 기준으로 총 3회 숫자올려서 검사 (사이트 주소가 자주 바뀌기 때문에)
 async function checkSite(site, query, retryCount = 3) {
@@ -39,6 +40,7 @@ async function getTodayUpdateData(site, query, currentPage = 1, totalDataArr = [
     }
 }
 
+//현재 업데이트 된 페이지 긁어오기
 async function getUpdatePageData(page) {
 
     const $ = cheerio.load(page.data, { ignoreWhitespace: true })
@@ -48,7 +50,7 @@ async function getUpdatePageData(page) {
         .map(async data => {
 
             const comicLink = data.find('div.post-info a').attr('href')
-           
+
             //자꾸 403 forbidden 걸림 천천히 긁어와야 하나...
             // const comicPageData = await getComicPageData(comicLink)
 
@@ -58,10 +60,13 @@ async function getUpdatePageData(page) {
             const link = data.find('div.post-subject a').attr('href') || ''
             const uploadDate = data.find('span.txt-normal').text() || moment(new Date()).format('MM-DD')
             const thumbnail = data.find('div.img-wrap img').attr('src')
-            
+
             return { title, link, uploadDate, thumbnail, comicLink }
         }))
 }
+
+//현재 업데이트 된 페이지에서  배치 목록만 긁어오기
+const filterBatchItem = (updateList, batchList) => updateList.filter(({ title }) => batchList.find(batch => title.includes(batch.title)))
 
 async function getComicPageData(siteUrl) {
 
@@ -77,7 +82,7 @@ async function getComicPageData(siteUrl) {
 
         const test = Array.from($('div.col-md-10 div.view-content'))
             .filter(data => $(data).find('strong').text())
-            .map(data=>{
+            .map(data => {
                 return $(data).find('a')
             })
     }
@@ -317,8 +322,52 @@ async function crawlingSite(site, query) {
     }
 }
 
-(async () => {
-    // crawlingSite(updatePage,{stx:'킹덤'})
-    const todayData = await getTodayUpdateData(updatePage, { page: 1 })
-    sendSlackMsg(todayData)
-})()
+const getSearchList = async (query) => {
+    try {
+        const page = await checkSite(searchPage, { stx: query })
+        if (page) {
+            const searchPage = await getSearchPageInfo(page)
+            return searchPage
+        }
+    } catch (err) {
+        console.error(`crawlingSite err : ${err}`)
+    }
+}
+
+const crawlingUpdateData = async () => {
+    const page = await checkSite(updatePage, { page: 1 })
+    if (page) {
+        const updatePageList = await getUpdatePageData(page)
+        return updatePageList
+    }
+}
+
+const crawlingBatchData = async () => {
+
+    const batchList = await getManatokiBatchList()
+
+    if (batchList && batchList.length > 0) {
+        const page = await checkSite(updatePage, { page: 1 })
+        if (page) {
+            const updatePageList = await getUpdatePageData(page)
+            const crawlingList = filterBatchItem(updatePageList, batchList)
+            return crawlingList
+        }
+    } else {
+        console.log('배치 목록 없음.')
+    }
+}
+
+
+// (async () => {
+//     await crawlingSite(searchPage,{stx:'아유무'})
+//     const todayData = await getTodayUpdateData(updatePage, { page: 1 })
+//     sendSlackMsg(todayData)
+// })()
+
+
+module.exports = {
+    getSearchList: getSearchList,
+    crawlingUpdateData: crawlingUpdateData,
+    crawlingBatchData: crawlingBatchData
+}
