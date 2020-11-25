@@ -2,10 +2,10 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const Async = require('async');
 const moment = require('moment');
-const { sendSlackMsg } = require('./manatoki_scheduler');
-const searchPage = 'https://manatoki87.net/bbs/search.php?'
-const updatePage = 'https://manatoki87.net/page/update'
-const { saveSuccessNo, getSuccssNo } = require('./util/files')
+const { sendSlackMsg, addManatokiBatch } = require('./repository/repository');
+const { SEARCH_PAGE, UPDATE_PAGE } = require('./appConstants');
+const { saveSuccessNo, getSuccssNo } = require('./util/files');
+const { wait } = require('./util/utils');
 const { getManatokiBatchList } = require('./repository/repository');
 
 //최근 성공했던 숫자 기준으로 총 3회 숫자올려서 검사 (사이트 주소가 자주 바뀌기 때문에)
@@ -21,7 +21,7 @@ async function checkSite(site, query, retryCount = 3) {
         })
 }
 
-//오늘 데이터 뽑아오기(모든 페이지)
+//오늘자 데이터 뽑아오기(모든 페이지)
 async function getTodayUpdateData(site, query, currentPage = 1, totalDataArr = []) {
 
     const page = await checkSite(site, query)
@@ -55,8 +55,8 @@ async function getUpdatePageData(page) {
             // const comicPageData = await getComicPageData(comicLink)
 
             const title = /.*화/.exec(data.find('div.post-subject a').text())
-                ? /.*화/.exec(data.find('div.post-subject a').text().replace(/([\t|\n|\s])/gi, "")).toString()
-                : data.find('div.post-subject a').text().replace(/([\t|\n|\s])/gi, "").toString()
+                ? /.*화/.exec(data.find('div.post-subject a').text().replace(/([\t|\n])/gi, "")).toString().trim()
+                : data.find('div.post-subject a').text().replace(/([\t|\n])/gi, "").toString().trim()
             const link = data.find('div.post-subject a').attr('href') || ''
             const uploadDate = data.find('span.txt-normal').text() || moment(new Date()).format('MM-DD')
             const thumbnail = data.find('div.img-wrap img').attr('src')
@@ -68,23 +68,30 @@ async function getUpdatePageData(page) {
 //현재 업데이트 된 페이지에서  배치 목록만 긁어오기
 const filterBatchItem = (updateList, batchList) => updateList.filter(({ title }) => batchList.find(batch => title.includes(batch.title)))
 
+
 async function getComicPageData(siteUrl) {
 
-    const site = await axios.get(siteUrl)
-        .catch(e => console.error(`axios err : ${e}`))
+    try {
 
-    if (site) {
-        const $ = cheerio.load(site.data)
+        const site = await axios.get(siteUrl)
+            .catch(e => { throw new Error(`getComicPageData 접속 에러 : ${e}`) })
 
-        const title = Array.from($('meta'))
-            .filter(data => $(data).attr('name') === 'subject')
-            .map(data => $(data).attr('content'))
+        if (site) {
+            const $ = cheerio.load(site.data)
 
-        const test = Array.from($('div.col-md-10 div.view-content'))
-            .filter(data => $(data).find('strong').text())
-            .map(data => {
-                return $(data).find('a')
-            })
+            const title = Array.from($('meta'))
+                .filter(data => $(data).attr('name') === 'subject')
+                .map(data => $(data).attr('content'))
+
+            const test = Array.from($('div.col-md-10 div.view-content'))
+                .filter(data => $(data).find('strong').text())
+                .map(data => {
+                    return $(data).find('a')
+                })
+        }
+    } catch (e) {
+        console.error(e)
+        return false
     }
 
 }
@@ -208,13 +215,6 @@ async function getDetailPageInfo(tempTitle, tempUrl) {
     return detailArr
 }
 
-function wait(time) {
-    return new Promise(res => {
-        setTimeout(() => {
-            res()
-        }, time);
-    })
-}
 
 //페이지가 바로 로딩이 안되서 스크롤로 조금씩 내려가서 이미지 로딩 유도
 async function scrollAction(page) {
@@ -322,11 +322,13 @@ async function crawlingSite(site, query) {
     }
 }
 
+//만화 검색후 결과 서버에 보내줌
 const getSearchList = async (query) => {
     try {
-        const page = await checkSite(searchPage, { stx: query })
+        const page = await checkSite(SEARCH_PAGE, { stx: query })
         if (page) {
             const searchPage = await getSearchPageInfo(page)
+            // await addManatokiBatch(searchPage)
             return searchPage
         }
     } catch (err) {
@@ -334,20 +336,22 @@ const getSearchList = async (query) => {
     }
 }
 
+//업데이트 페이지 크롤링 후 결과 서버에 보내줌
 const crawlingUpdateData = async () => {
-    const page = await checkSite(updatePage, { page: 1 })
+    const page = await checkSite(UPDATE_PAGE, { page: 1 })
     if (page) {
         const updatePageList = await getUpdatePageData(page)
         return updatePageList
     }
 }
 
+//서버에 있는 배치목록 가져와서 해당 배치목록이 업데이트 만화에 있으면 가져옴
 const crawlingBatchData = async () => {
 
     const batchList = await getManatokiBatchList()
 
     if (batchList && batchList.length > 0) {
-        const page = await checkSite(updatePage, { page: 1 })
+        const page = await checkSite(UPDATE_PAGE, { page: 1 })
         if (page) {
             const updatePageList = await getUpdatePageData(page)
             const crawlingList = filterBatchItem(updatePageList, batchList)
@@ -357,14 +361,6 @@ const crawlingBatchData = async () => {
         console.log('배치 목록 없음.')
     }
 }
-
-
-// (async () => {
-//     await crawlingSite(searchPage,{stx:'아유무'})
-//     const todayData = await getTodayUpdateData(updatePage, { page: 1 })
-//     sendSlackMsg(todayData)
-// })()
-
 
 module.exports = {
     getSearchList: getSearchList,
