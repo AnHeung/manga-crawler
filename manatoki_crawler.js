@@ -3,10 +3,10 @@ const cheerio = require('cheerio');
 const Async = require('async');
 const moment = require('moment');
 const { sendSlackMsg, addManatokiBatch } = require('./repository/repository');
-const {type, SEARCH_PAGE, UPDATE_PAGE } = require('./appConstants');
+const { type, SEARCH_PAGE, UPDATE_PAGE } = require('./appConstants');
 const { saveSuccessNo, getSuccssNo } = require('./util/files');
-const { wait } = require('./util/utils');
-const { getManatokiBatchList } = require('./repository/repository');
+const { wait} = require('./util/utils');
+const { getManatokiBatchList , addManatokiComplete , getManatokiComplete } = require('./repository/repository');
 
 //최근 성공했던 숫자 기준으로 총 3회 숫자올려서 검사 (사이트 주소가 자주 바뀌기 때문에)
 async function checkSite(site, query, retryCount = 3) {
@@ -67,6 +67,9 @@ async function getUpdatePageData(page) {
 
 //현재 업데이트 된 페이지에서  배치 목록만 긁어오기
 const filterBatchItem = (updateList, batchList) => updateList.filter(({ title }) => batchList.find(batch => title.includes(batch.title)))
+
+//과거 다운받았던 데이터와 비교해서 새로운것만 가져오기
+const compareList = (filteredList, completedList) => completedList.filter(({ title }) => filteredList.find(filteredData => title === filteredData.title))
 
 
 async function getComicPageData(siteUrl) {
@@ -354,14 +357,20 @@ const schedulingBatchComics = async () => {
         const page = await checkSite(UPDATE_PAGE, { page: 1 })
         if (page) {
             const updatePageList = await getUpdatePageData(page)
-            const crawlingList = filterBatchItem(updatePageList, batchList)
+            const filteredList = filterBatchItem(updatePageList, batchList)
+            const completedList = await getManatokiComplete()
+            let crawlingList = filteredList;
+            if(completedList && completedList.length > 0){
+                crawlingList = compareList(filteredList, completedList)
+            }
 
-            if(crawlingList && crawlingList.length > 0) return sendSlackMsg(type,crawlingList)
-            return false
+            if (crawlingList && crawlingList.length > 0) {
+                await sendSlackMsg(type, crawlingList)
+                return await addManatokiComplete(crawlingList)
+            }
         }
-    } else {
-        console.log('배치 목록 없음.')
     }
+    console.log('배치 목록 없음.')
 }
 
 module.exports = {

@@ -4,7 +4,8 @@ require('dotenv-flow').config({
 });
 
 const SLACK_API_URL = process.env.SLACK_API_URL
-const BATCH_API_URL = process.env.BATCH_API_URL
+const BATCH_API_URL = `${process.env.MANATOKI_API_URL}batch/`
+const COMPLETE_API_URL = `${process.env.MANATOKI_API_URL}complete/`
 const type = 'manatoki';
 
 
@@ -16,5 +17,6 @@ module.exports = {
     SEARCH_PAGE:SEARCH_PAGE,
     UPDATE_PAGE:UPDATE_PAGE,
     SLACK_API_URL:SLACK_API_URL,
-    BATCH_API_URL:BATCH_API_URL
+    BATCH_API_URL:BATCH_API_URL,
+    COMPLETE_API_URL:COMPLETE_API_URL
 }

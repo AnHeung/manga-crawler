@@ -7,5 +7,5 @@ const wait = (time)=>{
 }
 
 module.exports = {
-    wait: wait
+    wait: wait,
 }
