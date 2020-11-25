@@ -143,7 +143,7 @@ async function connectSite(params) {
             site = site.replace(/\d+(?=\.net)/, siteNo)
 
             console.log(`접속 시도 사이트 ${site}`)
-            const page = await axios.get(site, { params: query, timeout: 15000 })
+            const page = await axios.get(site, { params: query, timeout: 30000 })
                 .catch(e => {
                     console.error(`axios 통신 에러 ${e}`)
                 })
