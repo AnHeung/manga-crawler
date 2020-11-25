@@ -15,7 +15,7 @@ const sendSlackMsg = async (type,data)=>{
     return await Axios.post(SLACK_API_URL, params)
         .then(true)
         .catch(e => {
-            console.error(e)
+            console.error(`sendSlackMsg error : ${e}`)
             return false
         })
 }

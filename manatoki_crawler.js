@@ -355,7 +355,7 @@ const schedulingBatchComics = async () => {
         if (page) {
             const updatePageList = await getUpdatePageData(page)
             const crawlingList = filterBatchItem(updatePageList, batchList)
-            
+
             if(crawlingList && crawlingList.length > 0) return sendSlackMsg(type,crawlingList)
             return false
         }
