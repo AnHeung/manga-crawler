@@ -36,7 +36,7 @@ const addManatokiComplete = async (complete)=>{
 const getManatokiComplete = async ()=>{
 
     return await Axios.get(COMPLETE_API_URL)
-        .then(true)
+        .then(res=>res.data.data)
         .catch(e => {
             console.error(`sendSlackMsg error : ${e}`)
             return false
