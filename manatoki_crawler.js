@@ -3,7 +3,7 @@ const cheerio = require('cheerio');
 const Async = require('async');
 const moment = require('moment');
 const { sendSlackMsg, addManatokiBatch } = require('./repository/repository');
-const { SEARCH_PAGE, UPDATE_PAGE } = require('./appConstants');
+const {type, SEARCH_PAGE, UPDATE_PAGE } = require('./appConstants');
 const { saveSuccessNo, getSuccssNo } = require('./util/files');
 const { wait } = require('./util/utils');
 const { getManatokiBatchList } = require('./repository/repository');
@@ -346,7 +346,7 @@ const crawlingUpdateData = async () => {
 }
 
 //서버에 있는 배치목록 가져와서 해당 배치목록이 업데이트 만화에 있으면 가져옴
-const crawlingBatchData = async () => {
+const schedulingBatchComics = async () => {
 
     const batchList = await getManatokiBatchList()
 
@@ -355,7 +355,9 @@ const crawlingBatchData = async () => {
         if (page) {
             const updatePageList = await getUpdatePageData(page)
             const crawlingList = filterBatchItem(updatePageList, batchList)
-            return crawlingList
+            
+            if(crawlingList && crawlingList.length > 0) return sendSlackMsg(type,crawlingList)
+            return false
         }
     } else {
         console.log('배치 목록 없음.')
@@ -365,5 +367,5 @@ const crawlingBatchData = async () => {
 module.exports = {
     getSearchList: getSearchList,
     crawlingUpdateData: crawlingUpdateData,
-    crawlingBatchData: crawlingBatchData
+    schedulingBatchComics: schedulingBatchComics
 }
