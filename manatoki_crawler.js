@@ -330,7 +330,7 @@ const getSearchList = async (query) => {
         const page = await checkSite(SEARCH_PAGE, { stx: query })
         if (page) {
             const searchPage = await getSearchPageInfo(page)
-            // await addManatokiBatch(searchPage)
+            await addManatokiBatch(searchPage)
             return searchPage
         }
     } catch (err) {
