@@ -8,9 +8,8 @@ const BATCH_API_URL = `${process.env.MANATOKI_API_URL}batch/`
 const COMPLETE_API_URL = `${process.env.MANATOKI_API_URL}complete/`
 const type = 'manatoki';
 
-
-const SEARCH_PAGE = 'https://manatoki87.net/bbs/search.php?'
-const UPDATE_PAGE = 'https://manatoki87.net/page/update'
+const SEARCH_PAGE = 'https://manatoki92.net/comic'
+const UPDATE_PAGE = 'https://manatoki92.net/page/update'
 
 module.exports = {
     type:type,

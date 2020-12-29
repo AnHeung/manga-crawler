@@ -174,26 +174,46 @@ async function retry(n = 0, tryCount, promise, params) {
     })
 }
 
+// //검색 페이지 리스트
+// async function getSearchPageInfo(page) {
+
+//     const $ = cheerio.load(page.data, { ignoreWhitespace: true })
+
+//     //해당 쿼리로 검색시 나오는 목록
+//     const comicArr = Array.from($("div.search-media div.media"))
+//         .map(raw => $(raw))
+//         .map(data => {
+//             const url = data.find('div.media-content a').attr('href') || ''
+//             const imgUrl = data.find('img').attr('src') || ''
+//             const title = data.find('div.media-heading').text().trim() || ''
+//             const author = data.find('div.media-info').text().trim() || ''
+//             return { url, imgUrl, title, author }
+//         })
+//     console.log(`검색페이지에서 나오는 만화 목록 : ${comicArr}`)
+
+//     return comicArr
+// }
+
+
 //검색 페이지 리스트
 async function getSearchPageInfo(page) {
 
     const $ = cheerio.load(page.data, { ignoreWhitespace: true })
 
     //해당 쿼리로 검색시 나오는 목록
-    const comicArr = Array.from($("div.search-media div.media"))
+    const comicArr = Array.from($('div.list-container div.list-row'))
         .map(raw => $(raw))
         .map(data => {
-            const url = data.find('div.media-content a').attr('href') || ''
-            const imgUrl = data.find('img').attr('src') || ''
-            const title = data.find('div.media-heading').text().trim() || ''
-            const author = data.find('div.media-info').text().trim() || ''
+            const url = data.find('div.img-item a').attr('href') || ''
+            const imgUrl = data.find('div.img-item a img').attr('src') || ''
+            const title = data.find('div.in-lable span').text() || ''
+            const author = data.find('div.list-artist a').text().trim() || ''
             return { url, imgUrl, title, author }
         })
     console.log(`검색페이지에서 나오는 만화 목록 : ${comicArr}`)
 
     return comicArr
 }
-
 //검색해서 클릭까지 햇을때 해당 만화 세부페이지
 async function getDetailPageInfo(tempTitle, tempUrl) {
 
