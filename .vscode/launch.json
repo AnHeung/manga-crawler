@@ -6,7 +6,7 @@
     "configurations": [
         {
             "name": "app 실행",
-            "program": "${workspaceFolder}/api.js",
+            "program": "${workspaceFolder}/manatoki_crawler.js",
             "request": "launch",
             "skipFiles": [
                 "<node_internals>/**"

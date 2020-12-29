@@ -3,7 +3,7 @@ const defaultPath = './succssNo.json';
 
 exports.saveSuccessNo = async (successNo) => {
 
-    const data = JSON.stringify({successNo: successNo || 84})
+    const data = JSON.stringify({successNo: successNo || 92})
 
     return new Promise(res => {
         fs.writeFile(defaultPath, data, e => {
@@ -28,15 +28,14 @@ async function isFileExist() {
 exports.getSuccssNo = async () => {
 
     const fileExist = await isFileExist()
-
     
     if (fileExist) {
         const json = fs.readFileSync(defaultPath, 'utf-8')
         if (json) return JSON.parse(json).successNo
-        return 87
+        return 92
     } else {
         await this.saveSuccessNo()
-        return 87
+        return 92
     }
 }
 
