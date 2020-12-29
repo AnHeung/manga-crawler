@@ -372,10 +372,6 @@ const schedulingBatchComics = async () => {
     console.log('배치 목록 없음.')
 }
 
-(async ()=>{
-    await schedulingBatchComics();
-})()
-
 module.exports = {
     getSearchList: getSearchList,
     crawlingUpdateData: crawlingUpdateData,
