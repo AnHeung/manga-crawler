@@ -6,16 +6,15 @@ require('dotenv-flow').config({
 const SLACK_API_URL = process.env.SLACK_API_URL
 const BATCH_API_URL = `${process.env.MANATOKI_API_URL}batch/`
 const COMPLETE_API_URL = `${process.env.MANATOKI_API_URL}complete/`
+const CONFIG_API_URL = `${process.env.MANATOKI_API_URL}config/`
 const type = 'manatoki';
 
-const SEARCH_PAGE = 'https://manatoki92.net/comic'
-const UPDATE_PAGE = 'https://manatoki92.net/page/update'
+
 
 module.exports = {
     type:type,
-    SEARCH_PAGE:SEARCH_PAGE,
-    UPDATE_PAGE:UPDATE_PAGE,
     SLACK_API_URL:SLACK_API_URL,
     BATCH_API_URL:BATCH_API_URL,
-    COMPLETE_API_URL:COMPLETE_API_URL
+    COMPLETE_API_URL:COMPLETE_API_URL,
+    CONFIG_API_URL:CONFIG_API_URL,
 }

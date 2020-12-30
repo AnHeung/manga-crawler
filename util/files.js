@@ -1,12 +1,14 @@
 const fs = require('fs');
-const defaultPath = './succssNo.json';
+const defaultPath = './manatoki_config.json';
 
-exports.saveSuccessNo = async (successNo) => {
+exports.saveConfig = async (config) => {
 
-    const data = JSON.stringify({successNo: successNo || 92})
+    const searchPage = config.searchPage
+    const updatePage = config.updatePage
+    const successNo = config.successNo
 
     return new Promise(res => {
-        fs.writeFile(defaultPath, data, e => {
+        fs.writeFile(defaultPath, JSON.stringify({searchPage:searchPage , updatePage:updatePage , successNo:successNo}), e => {
             if (e) {
                 throw new Error()
             }
@@ -25,17 +27,17 @@ async function isFileExist() {
     })
 }
 
-exports.getSuccssNo = async () => {
+exports.getConfig = async () => {
 
     const fileExist = await isFileExist()
     
     if (fileExist) {
         const json = fs.readFileSync(defaultPath, 'utf-8')
-        if (json) return JSON.parse(json).successNo
-        return 92
+        if (json) return JSON.parse(json)
+        return {}
     } else {
         await this.saveSuccessNo()
-        return 92
+        return {}
     }
 }
 

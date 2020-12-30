@@ -5,6 +5,16 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "api Program",
+            "program": "${workspaceFolder}/api.js",
+            "request": "launch",
+            "skipFiles": [
+                "<node_internals>/**"
+            ],
+            "type": "pwa-node"
+        },
+        
+        {
             "name": "app 실행",
             "program": "${workspaceFolder}/manatoki_crawler.js",
             "request": "launch",

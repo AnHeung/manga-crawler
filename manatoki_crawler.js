@@ -3,17 +3,18 @@ const cheerio = require('cheerio');
 const Async = require('async');
 const moment = require('moment');
 const { sendSlackMsg, addManatokiBatch } = require('./repository/repository');
-const { type, SEARCH_PAGE, UPDATE_PAGE } = require('./appConstants');
-const { saveSuccessNo, getSuccssNo } = require('./util/files');
+let { type } = require('./appConstants');
+let SEARCH_PAGE = "https://manatoki92.net/comic"
+let UPDATE_PAGE = "https://manatoki92.net/page/update"
+let SUCCESS_NO = 92
+const { saveConfig, getConfig } = require('./util/files');
 const { wait } = require('./util/utils');
-const { getManatokiBatchList, addManatokiComplete, getManatokiComplete } = require('./repository/repository');
+const { saveManatokiConfig, getManatokiBatchList, addManatokiComplete, getManatokiComplete , getManatokiConfig } = require('./repository/repository');
 
 //최근 성공했던 숫자 기준으로 총 3회 숫자올려서 검사 (사이트 주소가 자주 바뀌기 때문에)
 async function checkSite(site, query, retryCount = 3) {
 
-    const siteNo = await getSuccssNo();
-
-    return retry(0, retryCount, connectSite, { site, siteNo, query })
+    return retry(0, retryCount, connectSite, { site, SUCCESS_NO, query })
         .then(data => data.page)
         .catch(e => {
             console.error(`getSiteInfo 에러 ${e}`)
@@ -136,7 +137,7 @@ async function connectSite(params) {
 
         setTimeout(async () => {
 
-            const siteNo = params.siteNo + params.n
+            const siteNo = params.SUCCESS_NO + params.n
             const query = params.query
             let site = params.site
             site = site.replace(/\d+(?=\.net)/, siteNo)
@@ -147,7 +148,8 @@ async function connectSite(params) {
                     console.error(`axios 통신 에러 ${e}`)
                 })
             if (page) {
-                saveSuccessNo(siteNo)
+                const configJson = site.includes("update") ? {updatePage:site , successNo: siteNo} : {searchPage:site , successNo: siteNo}
+                await saveManatokiConfig(JSON.stringify(configJson))
                 return res({ err: false, page: page })
             } else {
                 rej({ err: true, errMsg: `오류 ${page}` })
@@ -392,8 +394,21 @@ const schedulingBatchComics = async () => {
     console.log('배치 목록 없음.')
 }
 
+const initialManatokiConfig = async ()=>{
+
+    const configData = await getManatokiConfig();
+
+    if(configData && configData.length > 0){
+        UPDATE_PAGE = configData[0].updatePage
+        SEARCH_PAGE = configData[0].searchPage
+        SUCCESS_NO = configData[0].successNo
+        await saveConfig(configData[0])
+    }
+}
+
 module.exports = {
     getSearchList: getSearchList,
     crawlingUpdateData: crawlingUpdateData,
-    schedulingBatchComics: schedulingBatchComics
+    schedulingBatchComics: schedulingBatchComics,
+    initialManatokiConfig:initialManatokiConfig
 }

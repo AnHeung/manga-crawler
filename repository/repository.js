@@ -1,18 +1,37 @@
-const {BATCH_API_URL, SLACK_API_URL , COMPLETE_API_URL} = require('../appConstants');
+const { CONFIG_API_URL, BATCH_API_URL, SLACK_API_URL, COMPLETE_API_URL } = require('../appConstants');
 const Axios = require('axios');
 
 const getManatokiBatchList = async () => {
 
-    console.log(`마나토끼 배치 url :${BATCH_API_URL}`)
-
     return await Axios.get(BATCH_API_URL)
-        .then(res=>res.data.data)
+        .then(res => res.data.data)
         .catch(e => { throw new Error(`getManatokiBatchList 에러 : ${e}`) })
 }
 
-const sendSlackMsg = async (type,data)=>{
-    
-    const params = { type, data}
+
+const getManatokiConfig = async () => {
+
+    return await Axios.get(CONFIG_API_URL)
+        .then(res => res.data.data)
+        .catch(e => { throw new Error(`getManatokiBatchList 에러 : ${e}`) })
+}
+
+
+const saveManatokiConfig = async (config) => {
+
+    const params = { config: config }
+
+    return await Axios.post(CONFIG_API_URL, params)
+        .then(true)
+        .catch(e => {
+            console.error(`saveManatokiConfig error : ${e}`)
+            return false
+        })
+}
+
+const sendSlackMsg = async (type, data) => {
+
+    const params = { type, data }
 
     return await Axios.post(SLACK_API_URL, params)
         .then(true)
@@ -22,7 +41,7 @@ const sendSlackMsg = async (type,data)=>{
         })
 }
 
-const addManatokiComplete = async (complete)=>{
+const addManatokiComplete = async (complete) => {
     const params = { complete }
 
     return await Axios.post(COMPLETE_API_URL, params)
@@ -33,10 +52,10 @@ const addManatokiComplete = async (complete)=>{
         })
 }
 
-const getManatokiComplete = async ()=>{
+const getManatokiComplete = async () => {
 
     return await Axios.get(COMPLETE_API_URL)
-        .then(res=>res.data.data)
+        .then(res => res.data.data)
         .catch(e => {
             console.error(`sendSlackMsg error : ${e}`)
             return false
@@ -44,9 +63,9 @@ const getManatokiComplete = async ()=>{
 }
 
 
-const addManatokiBatch = async (comic)=>{
+const addManatokiBatch = async (comic) => {
 
-    const params = {comic}
+    const params = { comic }
 
     return await Axios.post(BATCH_API_URL, params)
         .then(true)
@@ -57,9 +76,11 @@ const addManatokiBatch = async (comic)=>{
 }
 
 module.exports = {
-    getManatokiBatchList:getManatokiBatchList,
-    sendSlackMsg : sendSlackMsg,
-    addManatokiBatch:addManatokiBatch,
-    getManatokiComplete:getManatokiComplete,
-    addManatokiComplete:addManatokiComplete
+    getManatokiBatchList: getManatokiBatchList,
+    sendSlackMsg: sendSlackMsg,
+    addManatokiBatch: addManatokiBatch,
+    getManatokiComplete: getManatokiComplete,
+    addManatokiComplete: addManatokiComplete,
+    getManatokiConfig: getManatokiConfig,
+    saveManatokiConfig:saveManatokiConfig
 }
