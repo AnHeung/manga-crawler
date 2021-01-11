@@ -55,8 +55,8 @@ async function getUpdatePageData(page) {
             //자꾸 403 forbidden 걸림 천천히 긁어와야 하나...
             // const comicPageData = await getComicPageData(comicLink)
 
-            const title = /.*화/.exec(data.find('div.post-subject a').text())
-                ? /.*화/.exec(data.find('div.post-subject a').text().replace(/([\t|\n])/gi, "")).toString().trim()
+            const title = /.*[화|권|부]/.exec(data.find('div.post-subject a').text())
+                ? /.*[화|권|부]/.exec(data.find('div.post-subject a').text().replace(/([\t|\n])/gi, "")).toString().trim()
                 : data.find('div.post-subject a').text().replace(/([\t|\n])/gi, "").toString().trim()
             const link = data.find('div.post-subject a').attr('href') || ''
             const uploadDate = data.find('span.txt-normal').text() || moment(new Date()).format('MM-DD')
