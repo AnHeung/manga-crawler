@@ -9,7 +9,7 @@ let UPDATE_PAGE = "https://manatoki92.net/page/update"
 let SUCCESS_NO = 92
 const { saveConfig, getConfig } = require('./util/files');
 const { wait } = require('./util/utils');
-const { saveManatokiConfig, getManatokiBatchList, addManatokiComplete, getManatokiComplete , getManatokiConfig } = require('./repository/repository');
+const { saveManatokiConfig, getManatokiBatchList, addManatokiComplete, getManatokiComplete, getManatokiConfig } = require('./repository/repository');
 
 //최근 성공했던 숫자 기준으로 총 3회 숫자올려서 검사 (사이트 주소가 자주 바뀌기 때문에)
 async function checkSite(site, query, retryCount = 3) {
@@ -70,7 +70,7 @@ async function getUpdatePageData(page) {
 const filterBatchItem = (updateList, batchList) => updateList.filter(({ title }) => batchList.find(batch => title.includes(batch.title))) || []
 
 //과거 다운받았던 데이터와 비교해서 새로운것만 가져오기
-const compareList = (filteredList, completedList) => filteredList.filter(({ title }) =>completedList.every(completeData => title !== completeData.title)) || []
+const compareList = (filteredList, completedList) => filteredList.filter(({ title }) => completedList.every(completeData => title !== completeData.title)) || []
 
 async function getComicPageData(siteUrl) {
 
@@ -148,7 +148,7 @@ async function connectSite(params) {
                     console.error(`axios 통신 에러 ${e}`)
                 })
             if (page) {
-                const configJson = site.includes("update") ? {updatePage:site , successNo: siteNo} : {searchPage:site , successNo: siteNo}
+                const configJson = site.includes("update") ? { updatePage: site, successNo: siteNo } : { searchPage: site, successNo: siteNo }
                 await saveManatokiConfig(JSON.stringify(configJson))
                 return res({ err: false, page: page })
             } else {
@@ -394,15 +394,22 @@ const schedulingBatchComics = async () => {
     console.log('배치 목록 없음.')
 }
 
-const initialManatokiConfig = async ()=>{
+const initialManatokiConfig = async () => {
 
-    const configData = await getManatokiConfig();
+    let configData = await getManatokiConfig();
 
-    if(configData && configData.length > 0){
+    if (configData && configData.length > 0) {
         UPDATE_PAGE = configData[0].updatePage
         SEARCH_PAGE = configData[0].searchPage
         SUCCESS_NO = configData[0].successNo
         await saveConfig(configData[0])
+    } else {
+        configData = await getConfig()
+        if (configData) {
+            UPDATE_PAGE = configData.updatePage
+            SEARCH_PAGE = configData.searchPage
+            SUCCESS_NO = configData.successNo
+        }
     }
 }
 
@@ -410,5 +417,5 @@ module.exports = {
     getSearchList: getSearchList,
     crawlingUpdateData: crawlingUpdateData,
     schedulingBatchComics: schedulingBatchComics,
-    initialManatokiConfig:initialManatokiConfig
+    initialManatokiConfig: initialManatokiConfig
 }
