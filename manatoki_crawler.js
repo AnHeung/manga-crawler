@@ -3,6 +3,7 @@ const cheerio = require('cheerio');
 const Async = require('async');
 const moment = require('moment');
 const { sendSlackMsg, addManatokiBatch } = require('./repository/repository');
+const {cleanText} = require('./util/utils');
 let { type } = require('./appConstants');
 let SEARCH_PAGE = "https://manatoki92.net/comic"
 let UPDATE_PAGE = "https://manatoki92.net/page/update"
@@ -56,8 +57,8 @@ async function getUpdatePageData(page) {
             // const comicPageData = await getComicPageData(comicLink)
 
             const title = /.*[화|권|부]/.exec(data.find('div.post-subject a').text())
-                ? /.*[화|권|부]/.exec(data.find('div.post-subject a').text().replace(/([\t|\n])/gi, "")).toString().trim()
-                : data.find('div.post-subject a').text().replace(/([\t|\n])/gi, "").toString().trim()
+                ? cleanText(/.*[화|권|부]/.exec(data.find('div.post-subject a').text()))
+                : cleanText(data.find('div.post-subject a').text())
             const link = data.find('div.post-subject a').attr('href') || ''
             const uploadDate = data.find('span.txt-normal').text() || moment(new Date()).format('MM-DD')
             const thumbnail = data.find('div.img-wrap img').attr('src')
@@ -227,9 +228,9 @@ async function getDetailPageInfo(tempTitle, tempUrl) {
     const detailArr = Array.from($('div.wr-subject'))
         .map(raw => $(raw))
         .map(data => {
-            const regex = new RegExp(tempTitle + '.*화', "gi")
+            const regex = new RegExp(tempTitle + '.*[화|권|부]', "gmi")
             const title = regex.exec(data.find('a').text())
-                ? regex.exec(data.find('a').text()).toString()
+                ? cleanText(regex.exec(data.find('a').text()))
                 : '제목없음'
             const url = data.find('a').attr('href') || ''
             console.log(`title :${title} ,  url : ${url}`)
@@ -327,7 +328,7 @@ async function getImgs(title, url, count = 0, currentPage) {
 async function crawlingSite(site, query) {
 
     try {
-        const page = await checkSite(site, query)
+        const page = await checkSite(site, {stx:query})
         if (page) {
             const searchPage = await getSearchPageInfo(page)
             //지금은 임시로 지정 추후 클라쪽 개발하면 검색해서 해당 아이템 클릭하면 검색하는식으로 
@@ -349,6 +350,7 @@ async function crawlingSite(site, query) {
 //만화 검색후 결과 서버에 보내줌
 const getSearchList = async (query) => {
     try {
+        await initialManatokiConfig();
         const page = await checkSite(SEARCH_PAGE, { stx: query })
         if (page) {
             const searchPage = await getSearchPageInfo(page)
@@ -412,6 +414,11 @@ const initialManatokiConfig = async () => {
         }
     }
 }
+
+// (async ( )=>{
+//     await initialManatokiConfig()
+//     await crawlingSite(SEARCH_PAGE, '킹덤')
+// })()
 
 module.exports = {
     getSearchList: getSearchList,
