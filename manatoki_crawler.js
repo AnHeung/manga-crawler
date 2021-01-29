@@ -57,7 +57,7 @@ async function getUpdatePageData(page) {
             // const comicPageData = await getComicPageData(comicLink)
 
             const title = /.*[화|권|부]/.exec(data.find('div.post-subject a').text())
-                ? cleanText(/.*[화|권|부]/.exec(data.find('div.post-subject a').text()))
+                ? cleanText(/.*[화|권|부]/.exec(data.find('div.post-subject a').text())[0])
                 : cleanText(data.find('div.post-subject a').text())
             const link = data.find('div.post-subject a').attr('href') || ''
             const uploadDate = data.find('span.txt-normal').text() || moment(new Date()).format('MM-DD')
@@ -230,7 +230,7 @@ async function getDetailPageInfo(tempTitle, tempUrl) {
         .map(data => {
             const regex = new RegExp(tempTitle + '.*[화|권|부]', "gmi")
             const title = regex.exec(data.find('a').text())
-                ? cleanText(regex.exec(data.find('a').text()))
+                ? cleanText(regex.exec(data.find('a').text())[0])
                 : '제목없음'
             const url = data.find('a').attr('href') || ''
             console.log(`title :${title} ,  url : ${url}`)
