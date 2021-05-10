@@ -1,9 +1,14 @@
-const axios = require('axios');
+const axios = require('axios').default;
+const axiosCookieJarSupport = require('axios-cookiejar-support').default;
+const tough = require('tough-cookie');
+const cookieJar = new tough.CookieJar();
 const cheerio = require('cheerio');
 const Async = require('async');
+const rest = require('restler');
 const moment = require('moment');
 const { sendSlackMsg, addManatokiBatch } = require('./repository/repository');
-const {cleanText} = require('./util/utils');
+const { cleanText,cleanTextWithNoNumber } = require('./util/utils');
+const { PROCESS_COUNT } = require('./appConstants');
 let { type } = require('./appConstants');
 let SEARCH_PAGE = "https://manatoki92.net/comic"
 let UPDATE_PAGE = "https://manatoki92.net/page/update"
@@ -11,6 +16,8 @@ let SUCCESS_NO = 92
 const { saveConfig, getConfig } = require('./util/files');
 const { wait } = require('./util/utils');
 const { saveManatokiConfig, getManatokiBatchList, addManatokiComplete, getManatokiComplete, getManatokiConfig } = require('./repository/repository');
+
+axiosCookieJarSupport(axios);
 
 //최근 성공했던 숫자 기준으로 총 3회 숫자올려서 검사 (사이트 주소가 자주 바뀌기 때문에)
 async function checkSite(site, query, retryCount = 3) {
@@ -58,7 +65,7 @@ async function getUpdatePageData(page) {
 
             const title = /.*[화|권|부]/.exec(data.find('div.post-subject a').text())
                 ? cleanText(/.*[화|권|부]/.exec(data.find('div.post-subject a').text())[0])
-                : cleanText(data.find('div.post-subject a').text())
+                : cleanTextWithNoNumber(data.find('div.post-subject a').text())
             const link = data.find('div.post-subject a').attr('href') || ''
             const uploadDate = data.find('span.txt-normal').text() || moment(new Date()).format('MM-DD')
             const thumbnail = data.find('div.img-wrap img').attr('src')
@@ -177,27 +184,6 @@ async function retry(n = 0, tryCount, promise, params) {
     })
 }
 
-// //검색 페이지 리스트
-// async function getSearchPageInfo(page) {
-
-//     const $ = cheerio.load(page.data, { ignoreWhitespace: true })
-
-//     //해당 쿼리로 검색시 나오는 목록
-//     const comicArr = Array.from($("div.search-media div.media"))
-//         .map(raw => $(raw))
-//         .map(data => {
-//             const url = data.find('div.media-content a').attr('href') || ''
-//             const imgUrl = data.find('img').attr('src') || ''
-//             const title = data.find('div.media-heading').text().trim() || ''
-//             const author = data.find('div.media-info').text().trim() || ''
-//             return { url, imgUrl, title, author }
-//         })
-//     console.log(`검색페이지에서 나오는 만화 목록 : ${comicArr}`)
-
-//     return comicArr
-// }
-
-
 //검색 페이지 리스트
 async function getSearchPageInfo(page) {
 
@@ -230,11 +216,8 @@ async function getDetailPageInfo(tempTitle, tempUrl) {
         .map(data => {
             const regex = new RegExp(tempTitle + '.*[화|권|부]', "gmi")
             const title = regex.exec(data.find('a').text())
-                ? cleanText(regex.exec(data.find('a').text())[0])
-                : '제목없음'
             const url = data.find('a').attr('href') || ''
-            console.log(`title :${title} ,  url : ${url}`)
-            return { title, url }
+            return { title: title ? cleanText(title[0]) : title, url }
         })
     console.log(`세부 목록 ${JSON.stringify(detailArr)}`)
     return detailArr
@@ -245,11 +228,12 @@ async function getDetailPageInfo(tempTitle, tempUrl) {
 async function scrollAction(page) {
     const scrollHeight = 'document.body.scrollHeight';
     let previousHeight = await page.evaluate(scrollHeight);
-    const per = previousHeight / 10
+    const perSize = 10
+    const per = previousHeight / perSize
 
-    await page.evaluate(async (per) => {
+    await page.evaluate((per, perSize) => {
         let promise = Promise.resolve()
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < perSize; i++) {
             promise = promise.then(() => {
                 return new Promise(res => {
                     setTimeout(() => {
@@ -260,7 +244,7 @@ async function scrollAction(page) {
             })
         }
         return promise
-    }, (per));
+    }, (per, perSize));
 }
 
 //브라우저로 이미지가 로딩될때까지 기다림
@@ -286,18 +270,21 @@ async function getImgs(title, url, count = 0, currentPage) {
     let downImgs = [];
 
     try {
-        if (count === 3) throw new Error('3회 초과')
+        // if (count === 3) throw new Error('3회 초과')
 
-        const page = currentPage || await loadingBrowser(url)
-        await browserWaitForImgLoading(page)
-        const content = await page.content()
-        const $ = cheerio.load(content)
+        const page = await getPage(url)
+        // await browserWaitForImgLoading(page)
+        // const content = await page.content()
+        // (?<=data_attribute:).+
+        const $ = cheerio.load(page)
+        const regex = /(?<=data_attribute:).+/.exec(page)
         const imgArr = Array.from($('div.view-padding img')).map(data => $(data).attr('src'))
+        if (imgArr.length < 2) return getImgs(title, url, ++count, page)
 
         const isLoading = imgArr.find(data => data.includes('loading-image'))
         //크롤링 햇을때 이미지가 아직 로딩중이라면...
-        if (isLoading) {
-            await page.reload({ waitUntil: ['networkidle0'] });
+        if (isLoading && count <= 3) {
+            // await page.reload({ waitUntil: ['networkidle0'] });
             return getImgs(title, url, ++count, page)
         } else {
             downImgs = Array.from($('div.view-padding div'))
@@ -315,7 +302,7 @@ async function getImgs(title, url, count = 0, currentPage) {
                     return acc
                 }, [])
         }
-        if (page) page.browser().close()
+        // if (page) page.browser().close()
         console.log(`downImg : ${downImgs}`)
         return { title: title, data: downImgs };
     } catch (err) {
@@ -324,11 +311,42 @@ async function getImgs(title, url, count = 0, currentPage) {
     }
 }
 
+async function getPage(url) {
+
+    await wait(2000);
+
+    // return new Promise((res)=>{
+    //     rest.get(url).on('complete', function(result){
+    //         if(result instanceof Error){
+    //             console.log(`err : ${result.message}`)
+    //             this.retry(5000)
+    //         }else{
+    //             console.log(result)
+    //             res(result)
+    //         }
+
+    //     })
+    // })
+
+
+   
+
+    return await axios.get(url, {
+        jar: cookieJar, 
+        withCredentials: true, // If true, send cookie stored in jar
+    })
+        .then(page => page.data)
+        .catch(e => {
+            console.error(`getPage 접속 에러 : ${e}`)
+            return false
+        })
+}
+
 //만화 조회해서 총 만화목록 긁어오는 로직
 async function crawlingSite(site, query) {
 
     try {
-        const page = await checkSite(site, {stx:query})
+        const page = await checkSite(site, { stx: query })
         if (page) {
             const searchPage = await getSearchPageInfo(page)
             //지금은 임시로 지정 추후 클라쪽 개발하면 검색해서 해당 아이템 클릭하면 검색하는식으로 
@@ -337,7 +355,7 @@ async function crawlingSite(site, query) {
             const detailSite = await getDetailPageInfo(tempTitle, tempUrl)
 
             const downloadImgArr = await Async
-                .mapLimit(detailSite.splice(0, 10), 10, async ({ title, url }) => await getImgs(title, url))
+                .mapLimit(detailSite.splice(0, 1), PROCESS_COUNT, async ({ title, url }) => await getImgs(title, url))
                 .catch(err => console.log(`downloadImgArr err : ${err}`))
 
             console.log(`총 다운 받은 이미지 리스트 : ${downloadImgArr}`)
@@ -414,11 +432,6 @@ const initialManatokiConfig = async () => {
         }
     }
 }
-
-// (async ( )=>{
-//     await initialManatokiConfig()
-//     await crawlingSite(SEARCH_PAGE, '킹덤')
-// })()
 
 module.exports = {
     getSearchList: getSearchList,
