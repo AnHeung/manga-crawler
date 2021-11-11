@@ -105,3 +105,9 @@ dist
 
 #config 파일
 manatoki_config.json
+
+#환경변수
+.env
+.env.*
+ecosystem.config.json
+ecosystem.config.js
