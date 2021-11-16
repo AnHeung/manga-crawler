@@ -1,5 +1,6 @@
-const { CONFIG_API_URL, BATCH_API_URL, SLACK_API_URL, COMPLETE_API_URL } = require('../appConstants');
+const { CONFIG_API_URL, BATCH_API_URL, SLACK_API_URL, COMPLETE_API_URL ,API_KEY, API_KEY_VALUE} = require('../appConstants');
 const Axios = require('axios');
+Axios.defaults.headers[API_KEY] = API_KEY_VALUE
 
 const getManatokiBatchList = async () => {
 

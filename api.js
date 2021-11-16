@@ -1,7 +1,5 @@
 const {getSearchList , crawlingUpdateData, schedulingBatchComics,initialManatokiConfig} = require('./manatoki_crawler');
-
 const searchData = async (query)=> await getSearchList(query) || false;
-
 const getUpdateData = async() => await crawlingUpdateData() || false;
 
 const schedulingManatokiBatch = async()=>{
